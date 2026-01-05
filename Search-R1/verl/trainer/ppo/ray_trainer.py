@@ -61,7 +61,7 @@ from verl.utils.seqlen_balancing import get_seqlen_balanced_partitions, log_seql
 from verl.utils.torch_functional import masked_mean
 from verl.utils.tracking import ValidationGenerationsLogger
 
-from videoagent.action_generation import VisionGenerationConfig,VisionLLMGenerationManager
+from search_r1.llm_agent.generation import GenerationConfig, LLMGenerationManager
 
 @dataclass
 class ResourcePoolManager:
@@ -1140,27 +1140,21 @@ class RayPPOTrainer:
         )
         next_step_profile = False
 
-        # Create Vision generation configuration
-        gen_config = VisionGenerationConfig(
+        # Create Search-R1 generation configuration
+        gen_config = GenerationConfig(
             max_turns=self.config.max_turns,
             max_start_length=self.config.data.max_start_length,
             max_prompt_length=self.config.data.max_prompt_length,
             max_response_length=self.config.data.max_response_length,
             max_obs_length=self.config.data.max_obs_length,
             num_gpus=self.config.trainer.n_gpus_per_node * self.config.trainer.nnodes,
-            # Vision-specific configuration
-            base_frame_dir=self.config.vision.get('base_frame_dir', '../bbt_frames'),
-            fps=self.config.vision.get('fps', 3),
-            num_frames=self.config.vision.get('num_frames', 7),
-            window_sec=self.config.vision.get('window_sec', 5),
-            vision_model=self.config.vision.get('model', 'Qwen/Qwen2.5-VL-32B-Instruct'),
-            api_key=self.config.vision.get('api_key', None),
-            bbox_json_path=self.config.vision.get('bbox_json_path', '../Tvqa_data/train_bbox_time.json'),
-            rollout_n=self.config.actor_rollout_ref.rollout.n,  # 添加rollout.n
+            no_think_rl=self.config.algorithm.get("no_think_rl", False),
+            search_url=self.config.get("retriever", {}).get("url"),
+            topk=self.config.get("retriever", {}).get("topk", 3),
         )
 
-        # Create Vision generation manager
-        generation_manager = VisionLLMGenerationManager(
+        # Create Search-R1 generation manager
+        generation_manager = LLMGenerationManager(
             tokenizer=self.tokenizer,
             actor_rollout_wg=self.actor_rollout_wg,
             config=gen_config,
@@ -1192,8 +1186,6 @@ class RayPPOTrainer:
                     repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True
                 )
 
-                video_ids = self._extract_video_ids_from_batch(gen_batch_output.non_tensor_batch)
-
                 is_last_step = self.global_steps >= self.total_training_steps
                 with marked_timer("step", timing_raw):
                     # generate a batch
@@ -1203,7 +1195,6 @@ class RayPPOTrainer:
                             gen_batch_output = generation_manager.run_llm_loop(
                                 gen_batch=gen_batch_output,
                                 initial_input_ids=first_input_ids,
-                                video_ids=video_ids,  # Pass video IDs for Vision processing
                             )
                         else:
                             gen_batch_output = self.async_rollout_manager.generate_sequences(gen_batch_output)
