@@ -39,7 +39,7 @@ from verl.utils.import_utils import load_extern_type
 #     raise
 # from verl.trainer.ppo.reward import load_reward_manager
 
-from videoagent.reward import load_reward_manager
+from search_r1.reward import load_reward_manager
 
 @hydra.main(config_path="config", config_name="ppo_trainer", version_base=None)
 def main(config):

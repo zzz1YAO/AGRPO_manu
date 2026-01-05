@@ -22,7 +22,7 @@ import hydra
 import ray
 from omegaconf import OmegaConf
 
-from videoagent.reward import load_reward_manager
+from search_r1.reward import load_reward_manager
 from verl.utils.device import is_cuda_available
 
 
